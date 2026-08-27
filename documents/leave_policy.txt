@@ -1,0 +1,35 @@
+HRMS Demo Company - Leave Policy
+
+1. Annual Leave
+
+Employees who are over 5 years of experience are entitled to 28 calendar days and employees below 5 years of experience are entitles to 21 calendar days of annual leave for each completed year of service.
+
+Annual leave requests should normally be submitted at least 7 working days before the intended leave date.
+
+All annual leave requests require approval from the employee's manager. In the absence of Manager the employee should get the approval from the reporting person of that employee.
+
+2. Sick Leave
+
+Employees may request sick leave when they are unable to work because of illness.
+An Employee gets 14 days of paid sick leave in a year form the company after submitting the authorized sick leave letter from the physician
+
+Employees should notify their manager as soon as reasonably possible.
+
+Medical documentation may be required according to company policy to get the paid sick leave
+
+3. Emergency Leave
+
+Emergency leave may be requested when an unexpected personal or family emergency prevents an employee from attending work.
+
+The minimum emergency leave requesting by the employee should be of 7 days.
+Employees should notify their manager as soon as possible.
+
+4. Leave Carry Forward
+
+Unused annual leave may be carried forward to the following year, subject to the company's applicable leave rules.
+
+5. Leave Requests
+
+Employees must submit leave requests through the HRMS system.
+
+The employee's manager reviews the request before it is approved or rejected.
