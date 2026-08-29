@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from backend.app.main import app, get_ingestion_service, get_rag_service
+from backend.app.main import app, get_hr_agent, get_ingestion_service, get_rag_service
 from backend.app.services.rag_service import RAGAnswer
 from backend.app.services.rag_service import RAGService
 
@@ -59,12 +59,39 @@ class FakeIngestionService:
         return {"source_filename": filename, "chunk_count": 1}
 
 
+class FakeAgent:
+    """Capture agent questions without invoking Gemini or other services."""
+
+    def __init__(self, answer: str) -> None:
+        self.answer = answer
+        self.received_question: str | None = None
+
+    def answer_question(self, question: str) -> str:
+        self.received_question = question
+        return self.answer
+
+
 def test_health_endpoint_returns_ok() -> None:
     """The health endpoint reports that the API is available."""
     response = TestClient(app).get("/health")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_agent_endpoint_allows_local_frontend_preflight() -> None:
+    """The API permits the Vite development origin to call the agent route."""
+    response = TestClient(app).options(
+        "/api/agent/ask",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
 def test_ask_endpoint_forwards_question_and_returns_answer() -> None:
@@ -146,3 +173,52 @@ def test_ingest_endpoint_rejects_missing_or_empty_filename() -> None:
 
     assert client.post("/api/rag/ingest", json={}).status_code == 422
     assert client.post("/api/rag/ingest", json={"filename": "   "}).status_code == 422
+
+
+def test_agent_endpoint_routes_employee_question_to_injected_agent() -> None:
+    """The agent endpoint returns an injected employee-tool answer."""
+    fake_agent = FakeAgent("Aisha Khan (E001) has 21 annual leave days.")
+    app.dependency_overrides[get_hr_agent] = lambda: fake_agent
+
+    try:
+        response = TestClient(app).post(
+            "/api/agent/ask",
+            json={"question": "How much leave does E001 have?"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert fake_agent.received_question == "How much leave does E001 have?"
+    assert response.json() == {
+        "question": "How much leave does E001 have?",
+        "answer": "Aisha Khan (E001) has 21 annual leave days.",
+    }
+
+
+def test_agent_endpoint_routes_policy_question_to_injected_agent() -> None:
+    """Policy questions are delegated to the injected deterministic agent."""
+    fake_agent = FakeAgent("Annual leave policy answer")
+    app.dependency_overrides[get_hr_agent] = lambda: fake_agent
+
+    try:
+        response = TestClient(app).post(
+            "/api/agent/ask",
+            json={"question": "How many annual leave days are employees entitled to?"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert fake_agent.received_question == (
+        "How many annual leave days are employees entitled to?"
+    )
+    assert response.json()["answer"] == "Annual leave policy answer"
+
+
+def test_agent_endpoint_rejects_missing_or_empty_question() -> None:
+    """The agent endpoint rejects missing and whitespace-only questions."""
+    client = TestClient(app)
+
+    assert client.post("/api/agent/ask", json={}).status_code == 422
+    assert client.post("/api/agent/ask", json={"question": " "}).status_code == 422

@@ -13,6 +13,9 @@ node_modules/
 dist/
 build/
 
+# Local vector database runtime data
+chroma_db/
+
 # IDE and OS files
 .vscode/
 .idea/

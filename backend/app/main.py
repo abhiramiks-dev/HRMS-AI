@@ -5,8 +5,12 @@ from functools import lru_cache
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from backend.app.agents.hr_agent import HRAgent
+from backend.app.agents.tools.employee_leave_tool import EmployeeLeaveTool
+from backend.app.agents.tools.policy_search_tool import PolicySearchTool
 from backend.app.services.embedding_service import EmbeddingService
 from backend.app.services.ingestion_service import IngestionService, IndexedDocument
 from backend.app.services.llm_service import LLMService
@@ -33,12 +37,29 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
 
 
 class RAGQuestionRequest(BaseModel):
     """Request body for asking a question about HR documents."""
 
     question: str = Field(min_length=1)
+
+
+class AgentQuestionResponse(BaseModel):
+    """Response body containing a deterministic agent answer."""
+
+    question: str
+    answer: str
 
 
 class IngestRequest(BaseModel):
@@ -83,6 +104,15 @@ def get_rag_service() -> RAGService:
 def get_ingestion_service() -> IngestionService:
     """Build and cache the application-level ingestion service."""
     return IngestionService()
+
+
+@lru_cache(maxsize=1)
+def get_hr_agent() -> HRAgent:
+    """Build the application-level agent from the shared RAG service."""
+    return HRAgent(
+        policy_search_tool=PolicySearchTool(get_rag_service()),
+        employee_leave_tool=EmployeeLeaveTool(),
+    )
 
 
 @app.get("/")
@@ -137,4 +167,20 @@ def ingest_document(
     return IngestResponse(
         filename=result["source_filename"],
         chunk_count=result["chunk_count"],
+    )
+
+
+@app.post("/api/agent/ask", response_model=AgentQuestionResponse)
+def ask_agent_question(
+    request: RAGQuestionRequest,
+    agent: HRAgent = Depends(get_hr_agent),
+) -> AgentQuestionResponse:
+    """Answer a question through the deterministic HR tool router."""
+    question = request.question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="question must not be empty")
+
+    return AgentQuestionResponse(
+        question=question,
+        answer=agent.answer_question(question),
     )
