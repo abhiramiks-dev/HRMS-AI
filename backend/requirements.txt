@@ -2,3 +2,6 @@ fastapi
 uvicorn[standard]
 pytest
 sentence-transformers
+chromadb
+google-genai
+python-dotenv
